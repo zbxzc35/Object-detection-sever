@@ -1,7 +1,4 @@
-
-import numpy as np
 import os
-from PIL import Image
 from flask import Flask, jsonify
 from flask_restful import Resource, Api, reqparse
 import sys
@@ -25,8 +22,6 @@ api = Api(app)
 FROZEN_MODEL = 'frozen_detection_model.pb'
 CATEGORY_INDEX_FILE = 'category_index.json'
 IMAGE_SIZE = (12, 8)
-# IMAGE_PATH = os.getcwd() + '/image3.jpg'
-# IMAGE_PATH = 'image3.jpg'
 NUMBER_OF_DETECTIONS = 20
 
 detection_graph = tf.Graph()
@@ -78,21 +73,28 @@ def timeit(method):
         return result
     return timed
 
-# @app.route('/detect')
 class ObjectDetect(Resource):
+    """
+    Detection API which determines the boxes on the file path of the image
+    """
 
     def show_detected_img(self, img_np, detected_dict):
+        """
+        Used to visually display the image along with detection boxes
+        :param img_np: image in numpy array format
+        :param detected_dict: dictionary with key as class name
+        and values as list of dictionary
+        :return: image displaying detections
+        """
         for coordinates_lst in detected_dict.values():
             for each_ordinate_set in coordinates_lst:
                 image_rgb = Image.fromarray(np.uint8(img_np)).convert('RGB')
                 draw = ImageDraw.Draw(image_rgb)
-                print("coordinates :: ", each_ordinate_set)
                 (left, right, top, bottom) = each_ordinate_set
                 # (right, left, bottom, top, ) = each_ordinate_set
                 draw.line([(left, top), (left, bottom), (right, bottom),
                            (right, top), (left, top)], width=2, fill='red')
                 np.copyto(img_np, np.array(image_rgb))
-
         # Display the decoded image to verify if it has been decoded
         cv2.imwrite('color_img.jpg', img_np)
         cv2.imshow('Color image', img_np)
@@ -101,7 +103,6 @@ class ObjectDetect(Resource):
 
     @timeit
     def get(self):
-        # print("------------->>>>", IMAGE_PATH)
         parser = reqparse.RequestParser()
         parser.add_argument('image_path', type=str)
         args = parser.parse_args()
@@ -114,8 +115,6 @@ class ObjectDetect(Resource):
         # print("image_np >> ", image_np, type(image_np), image_np.shape)
         # Expand dimensions since the model expects images to have shape: [1, None, None, 3]
         image_np_expanded = np.expand_dims(image_np, axis=0)
-        # print("image_np_expanded >> ", image_np_expanded,
-        #       type(image_np_expanded), image_np_expanded.shape)
         # Actual detection.
         (boxes, scores, classes, num) = sess.run(
             [detection_boxes, detection_scores, detection_classes, num_detections],
@@ -123,49 +122,33 @@ class ObjectDetect(Resource):
         boxes = np.squeeze(boxes)
         classes = np.squeeze(classes).astype(np.int32)
         scores = np.squeeze(scores)
-        print("boxes ------>>", boxes, type(boxes))
-        print("scores ------>>", scores)
-        print("classes ------>>", classes)
-        print("num ------>>", num)
         # Return the co-ordinates of 3 maximum predictions
         image_pil = Image.fromarray(np.uint8(image)).convert('RGB')
         image_width, image_height = image_pil.size
         print('\n')
-        # print("image_pil :: ", image_pil)
-        # print("image_width, image_height :: ", image_width, image_height)
-
         obj_class_dict = defaultdict()
         for i in range(0, NUMBER_OF_DETECTIONS):
             box = tuple(boxes[i].tolist())
             # left, right, top, bottom - Area defined
             ymin, xmin, ymax, xmax = box
-            # obj_ordinates.append(box)
             (xmin_abs, xmax_abs, ymin_abs, ymax_abs) = (xmin * image_width, xmax * image_width,
                                       ymin * image_height, ymax * image_height)
             mapper_class_lst = list(map(int, category_index.keys()))
+            # If the scores are greater than .5 only then show the detection boxes
             if scores[i] > 0.5:
-                print("scores[i] :: ", scores[i], i)
                 if classes[i] in mapper_class_lst:
-                    print("classes[i] :: ", classes[i], i)
                     class_name = category_index[str(classes[i])]['name']
-                    print("class_name ------>>", class_name)
-            # obj_ordinates.append((xmin_abs, xmax_abs, ymin_abs, ymax_abs))
                     #right, bottom, left, top
                     if class_name not in obj_class_dict:
                         obj_class_dict[class_name] = [(xmin_abs, xmax_abs, ymin_abs, ymax_abs)]
                     else:
                         obj_class_dict[class_name].append((xmin_abs, xmax_abs, ymin_abs, ymax_abs))
-
-        print("image_np_expanded :: ", image_np_expanded)
         self.show_detected_img(image_np, dict(obj_class_dict))
-
+        # Show\return the co-ordinates in the browser after the image window is closed
         return jsonify(obj_class_dict)
 
 api.add_resource(ObjectDetect, '/detect')
-
 if __name__ == '__main__':
-    # category_index = read_json(CATEGORY_INDEX_FILE)
-    # print("-->> ", category_index, type(category_index))
     app.run()
 
 
