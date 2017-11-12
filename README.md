@@ -19,4 +19,8 @@ The current implementation is a stand alone server on Flask which can output det
 
    
 How to use the file?
-   
+   - Run the object_detect_lite.py filrame as a python program.
+   - Hit the URL in the browser(chrome, firefox or internet explorer)
+   - In the URL, give the correct path of the image file
+   - The same image will be displayed with the detection boxes of the objects
+   - On closing the image window, the classes of the objects are shown along with their respective co-ordinates
